@@ -404,35 +404,41 @@ if "code" in query_params and st.session_state.xero_token is None:
     with st.spinner("🔄 Connecting to Xero..."):
         try:
             code = query_params["code"]
-            token_url = "https://identity.xero.com/connect/token"
-            data = {
-                "grant_type": "authorization_code",
-                "code": code,
-                "redirect_uri": REDIRECT_URI
-            }
+            state = query_params.get("state")
             
-            resp = requests.post(
-                token_url,
-                data=data,
-                auth=(XERO_CLIENT_ID, XERO_CLIENT_SECRET),
-                timeout=REQUEST_TIMEOUT
-            )
-            
-            if resp.ok:
-                token = resp.json()
-                token["created_at"] = datetime.now().isoformat()
-                st.session_state.xero_token = token
-                
-                # Get tenant ID
-                tenant_id = get_xero_tenant_id(token)
-                if tenant_id:
-                    st.session_state.xero_tenant_id = tenant_id
-                
-                st.success("🎉 Successfully connected to Xero!")
-                st.rerun()
+            # CSRF Protection
+            if state != "xero123":
+                st.error("❌ Invalid state parameter")
             else:
-                st.error(f"❌ Token exchange failed: {resp.text}")
-                logger.error(f"Token exchange error: {resp.text}")
+                token_url = "https://identity.xero.com/connect/token"
+                data = {
+                    "grant_type": "authorization_code",
+                    "code": code,
+                    "redirect_uri": REDIRECT_URI
+                }
+                
+                resp = requests.post(
+                    token_url,
+                    data=data,
+                    auth=(XERO_CLIENT_ID, XERO_CLIENT_SECRET),
+                    timeout=REQUEST_TIMEOUT
+                )
+                
+                if resp.ok:
+                    token = resp.json()
+                    token["created_at"] = datetime.now().isoformat()
+                    st.session_state.xero_token = token
+                    
+                    # Get tenant ID
+                    tenant_id = get_xero_tenant_id(token)
+                    if tenant_id:
+                        st.session_state.xero_tenant_id = tenant_id
+                    
+                    st.success("🎉 Successfully connected to Xero!")
+                    st.rerun()
+                else:
+                    st.error(f"❌ Token exchange failed: {resp.text}")
+                    logger.error(f"Token exchange error: {resp.text}")
         except Exception as e:
             st.error(f"❌ Connection error: {e}")
             logger.error(f"OAuth callback exception: {e}")
@@ -637,4 +643,4 @@ with tab4:
         st.info("📊 Import data and run analysis to generate report")
 
 st.divider()
-st.caption("Advisory Health Check • Live on Render")
+st.caption("Advisory Health Check • Live on Render • v2.1")
