@@ -85,24 +85,24 @@ if "code" in query_params and st.session_state.xero_token is None:
 
 # ======================= PULL XERO DATA =======================
 if st.session_state.get("xero_token"):
-   if st.button("📥 Fetch Xero Data"):
+      if st.button("📥 Fetch Xero Data"):
         with st.spinner("Fetching data from Xero..."):
             try:
                 headers = {
                     "Authorization": f"Bearer {st.session_state.xero_token['access_token']}",
                     "Xero-Tenant-Id": "",
-                    "Accept": "application/json"   # Force JSON
+                    "Accept": "application/json"
                 }
 
-                # Get Tenant
+                # Get Tenant ID
                 tenants_resp = requests.get("https://api.xero.com/connections", headers=headers)
-                if tenants_resp.ok:
+                if tenants_resp.ok and tenants_resp.json():
                     tenant = tenants_resp.json()[0]
                     tenant_id = tenant["tenantId"]
                     headers["Xero-Tenant-Id"] = tenant_id
                     st.success(f"Connected to: {tenant.get('tenantName', 'Your Organisation')}")
 
-                # Fetch with explicit JSON format
+                # Fetch Reports
                 params = {"periods": 6, "timeframe": "MONTH"}
 
                 bs_resp = requests.get(
@@ -119,6 +119,18 @@ if st.session_state.get("xero_token"):
                 st.write("Balance Sheet Status:", bs_resp.status_code)
                 st.write("P&L Status:", pl_resp.status_code)
 
+                if bs_resp.ok and pl_resp.ok:
+                    bs_data = bs_resp.json()
+                    pl_data = pl_resp.json()
+                    st.success("✅ Successfully received JSON data from Xero!")
+                    st.json(bs_data)  # Temporary debug - shows the full data
+
+                else:
+                    st.error("Failed to fetch reports")
+                    st.write(bs_resp.text[:800])
+
+            except Exception as e:
+                st.error(f"Error: {str(e)}")
                 # Force JSON parsing
                 if bs_resp.ok:
                     try:
