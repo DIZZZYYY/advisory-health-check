@@ -85,7 +85,7 @@ if "code" in query_params and st.session_state.xero_token is None:
 
 # ======================= PULL XERO DATA =======================
 if st.session_state.get("xero_token"):
-    if st.button("📥 Fetch Xero Data"):
+   if st.button("📥 Fetch Xero Data"):
         with st.spinner("Fetching data from Xero..."):
             try:
                 headers = {
@@ -125,6 +125,16 @@ if st.session_state.get("xero_token"):
                         bs_data = bs_resp.json()
                         pl_data = pl_resp.json()
                         st.success("✅ Successfully received JSON data!")
+                        st.json(bs_data)   # Show raw data for debugging
+                    except Exception as json_error:
+                        st.error(f"JSON Parse Error: {json_error}")
+                        st.write("Raw first 500 chars:", bs_resp.text[:500])
+                else:
+                    st.error("Failed to fetch reports")
+                    st.write(bs_resp.text[:800])
+
+            except Exception as e:
+                st.error(f"Error: {str(e)}")
                         
                         # Debug: Show raw data structure
                         with st.expander("📋 Debug: Raw Balance Sheet Data"):
