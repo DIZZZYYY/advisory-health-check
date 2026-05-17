@@ -32,8 +32,6 @@ XERO_CLIENT_SECRET = os.getenv("XERO_CLIENT_SECRET")
 
 if "xero_token" not in st.session_state:
     st.session_state.xero_token = None
-if "xero_data_df" not in st.session_state:
-    st.session_state.xero_data_df = None
 
 # ======================= SIDEBAR =======================
 with st.sidebar:
@@ -110,12 +108,14 @@ if st.session_state.get("xero_token"):
                 bs_resp = requests.get("https://api.xero.com/api.xro/2.0/Reports/BalanceSheet", headers=headers, params=params)
                 pl_resp = requests.get("https://api.xero.com/api.xro/2.0/Reports/ProfitAndLoss", headers=headers, params=params)
 
+                st.write("Balance Sheet Status:", bs_resp.status_code)
+                st.write("P&L Status:", pl_resp.status_code)
+
                 if bs_resp.ok and pl_resp.ok:
                     bs_data = bs_resp.json()
                     pl_data = pl_resp.json()
                     st.success("✅ Successfully received JSON data from Xero!")
-                    st.json(bs_data)  # Temporary debug
-
+                    st.json(bs_data)  # Temporary - shows raw data
                 else:
                     st.error("Failed to fetch reports")
                     st.write(bs_resp.text[:500])
@@ -129,6 +129,6 @@ uploaded_file = st.file_uploader("Or upload CSV as fallback", type=["csv"])
 if uploaded_file:
     df = pd.read_csv(uploaded_file)
     st.success("CSV data loaded")
-    # Add your existing calculations, metrics, charts, AI chat here later
+    # Add your calculations, charts, AI chat here later
 
 st.caption("Advisory Health Check • Live on Render")
