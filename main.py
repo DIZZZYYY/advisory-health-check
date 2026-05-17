@@ -85,26 +85,155 @@ if "code" in query_params and st.session_state.xero_token is None:
 
 # ======================= PULL XERO DATA =======================
 if st.session_state.get("xero_token"):
-    if st.button("📥 Pull Latest Data from Xero"):
-        try:
-            headers = {
-                "Authorization": f"Bearer {st.session_state.xero_token['access_token']}",
-                "Xero-Tenant-Id": ""  # Will be filled
-            }
-            # Get Tenant
-            tenants = requests.get("https://api.xero.com/connections", headers=headers).json()
-            if tenants:
-                tenant_id = tenants[0]["tenantId"]
-                headers["Xero-Tenant-Id"] = tenant_id
+    if st.button("📥 Fetch Xero Data"):
+        with st.spinner("Fetching data from Xero..."):
+            try:
+                headers = {
+                    "Authorization": f"Bearer {st.session_state.xero_token['access_token']}",
+                    "Xero-Tenant-Id": ""
+                }
 
-                bs_resp = requests.get("https://api.xero.com/api.xro/2.0/Reports/BalanceSheet?periods=6", headers=headers)
-                if bs_resp.ok:
-                    st.success("✅ Data pulled from Xero!")
-                    # TODO: Parse into df (we'll do this next)
+                # Get Tenant ID
+                tenants_resp = requests.get("https://api.xero.com/connections", headers=headers)
+                if tenants_resp.ok and tenants_resp.json():
+                    tenant = tenants_resp.json()[0]
+                    tenant_id = tenant["tenantId"]
+                    headers["Xero-Tenant-Id"] = tenant_id
+                    st.success(f"Connected to: {tenant.get('tenantName', 'Your Organisation')}")
+
+                # Fetch Reports
+                bs_resp = requests.get(
+                    "https://api.xero.com/api.xro/2.0/Reports/BalanceSheet?periods=6&timeframe=MONTH",
+                    headers=headers
+                )
+                pl_resp = requests.get(
+                    "https://api.xero.com/api.xro/2.0/Reports/ProfitAndLoss?periods=6&timeframe=MONTH",
+                    headers=headers
+                )
+
+                if bs_resp.ok and pl_resp.ok:
+                    bs_data = bs_resp.json()["Reports"][0]
+                    pl_data = pl_resp.json()["Reports"][0]
+
+                    # Better parsing function
+                    def extract_value(report_rows, label):
+                        for row in report_rows:
+                            if row.get("RowType") == "Row":
+                                cells = row.get("Cells", [])
+                                if cells and label.lower() in cells[0].get("Value", "").lower():
+                                    return [float(c.get("Value", 0) or 0) for c in cells[1:]]
+                        return [0.0] * 6
+
+                    # Extract key values
+                    period_names = [cell.get("Value", f"Period {i+1}") for i, cell in enumerate(bs_data["Rows"][0]["Cells"][1:])]
+
+                    current_assets = extract_value(bs_data.get("Rows", []), "Total Current Assets")
+                    total_assets = extract_value(bs_data.get("Rows", []), "Total Assets")
+                    current_liab = extract_value(bs_data.get("Rows", []), "Total Current Liabilities")
+                    total_liab = extract_value(bs_data.get("Rows", []), "Total Liabilities")
+                    net_profit = extract_value(pl_data.get("Rows", []), "Net Profit")
+                    equity = extract_value(bs_data.get("Rows", []), "Total Equity")
+
+                    # Build DataFrame
+                    data_list = []
+                    for i in range(len(period_names)):
+                        data_list.append({
+                            "Period": period_names[i],
+                            "Current_Assets": current_assets[i],
+                            "Current_Liabilities": current_liab[i],
+                            "Total_Assets": total_assets[i],
+                            "Total_Liabilities": total_liab[i],
+                            "Total_Equity": equity[i],
+                            "Net_Profit": net_profit[i]
+                        })
+
+                    df = pd.DataFrame(data_list)
+                    st.session_state.xero_data_df = df
+                    st.success("✅ Successfully extracted data from Xero!")
+                    st.dataframe(df)
+
+                    # ======================= FINANCIAL METRICS =======================
+                    st.subheader("📊 Financial Health Metrics")
+                    
+                    # Calculate key ratios for the latest period (most recent)
+                    latest_idx = -1
+                    
+                    current_ratio = current_assets[latest_idx] / current_liab[latest_idx] if current_liab[latest_idx] > 0 else 0
+                    debt_to_equity = total_liab[latest_idx] / equity[latest_idx] if equity[latest_idx] > 0 else 0
+                    solvency_ratio = total_assets[latest_idx] / total_liab[latest_idx] if total_liab[latest_idx] > 0 else 0
+                    equity_ratio = equity[latest_idx] / total_assets[latest_idx] if total_assets[latest_idx] > 0 else 0
+                    
+                    col1, col2, col3, col4 = st.columns(4)
+                    
+                    with col1:
+                        st.metric("Current Ratio", f"{current_ratio:.2f}", 
+                                  "Healthy" if current_ratio >= 1.5 else ("Warning" if current_ratio >= 1.0 else "⚠️ Critical"),
+                                  delta="Ideal: >1.5")
+                    
+                    with col2:
+                        st.metric("Debt-to-Equity", f"{debt_to_equity:.2f}",
+                                  "Healthy" if debt_to_equity < 2.0 else "⚠️ High",
+                                  delta="Lower is better")
+                    
+                    with col3:
+                        st.metric("Solvency Ratio", f"{solvency_ratio:.2f}",
+                                  "Healthy" if solvency_ratio > 2.0 else "⚠️ Watch",
+                                  delta="Ideal: >2.0")
+                    
+                    with col4:
+                        st.metric("Equity Ratio", f"{equity_ratio:.2%}",
+                                  "Healthy" if equity_ratio > 0.5 else "⚠️ Low",
+                                  delta="Ideal: >50%")
+
+                    # ======================= VISUALIZATIONS =======================
+                    st.subheader("📈 Financial Trends")
+                    
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        # Liquidity trend
+                        fig_liquidity = px.line(df, x="Period", y=["Current_Assets", "Current_Liabilities"],
+                                                title="Liquidity Trend (Current Assets vs Liabilities)",
+                                                markers=True)
+                        st.plotly_chart(fig_liquidity, use_container_width=True)
+                    
+                    with col2:
+                        # Profitability trend
+                        fig_profit = px.bar(df, x="Period", y="Net_Profit",
+                                           title="Net Profit Trend",
+                                           color="Net_Profit",
+                                           color_continuous_scale="RdYlGn")
+                        st.plotly_chart(fig_profit, use_container_width=True)
+                    
+                    col3, col4 = st.columns(2)
+                    
+                    with col3:
+                        # Debt structure
+                        fig_debt = px.line(df, x="Period", y=["Total_Liabilities", "Total_Equity"],
+                                          title="Capital Structure (Debt vs Equity)",
+                                          markers=True)
+                        st.plotly_chart(fig_debt, use_container_width=True)
+                    
+                    with col4:
+                        # Asset composition (latest period)
+                        latest_assets = df.iloc[-1]
+                        fig_assets = px.pie(values=[latest_assets["Total_Assets"] - latest_assets["Current_Assets"], 
+                                                    latest_assets["Current_Assets"]],
+                                           names=["Non-Current Assets", "Current Assets"],
+                                           title="Asset Composition (Latest Period)")
+                        st.plotly_chart(fig_assets, use_container_width=True)
+
                 else:
                     st.error("Failed to fetch reports")
-        except Exception as e:
-            st.error(f"Error: {e}")
+                    if not bs_resp.ok:
+                        st.write("Balance Sheet Error:", bs_resp.text[:500])
+                    if not pl_resp.ok:
+                        st.write("P&L Error:", pl_resp.text[:500])
+
+            except Exception as e:
+                st.error(f"Error: {str(e)}")
+                import traceback
+                st.write(traceback.format_exc())
 
 # ======================= CSV FALLBACK =======================
 uploaded_file = st.file_uploader("Or upload CSV as fallback", type=["csv"])
