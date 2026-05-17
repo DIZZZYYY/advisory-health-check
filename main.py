@@ -130,58 +130,78 @@ if st.session_state.get("xero_token"):
                     headers=headers
                 )
 
-                # Debug: Show status codes
-                st.write(f"Balance Sheet Status: {bs_resp.status_code}, Content Length: {len(bs_resp.text)}")
-                st.write(f"P&L Status: {pl_resp.status_code}, Content Length: {len(pl_resp.text)}")
+                # Debug: Show status codes and content
+                st.write(f"**Balance Sheet Status:** {bs_resp.status_code}")
+                st.write(f"**Balance Sheet Content Length:** {len(bs_resp.text)} chars")
+                st.write(f"**P&L Status:** {pl_resp.status_code}")
+                st.write(f"**P&L Content Length:** {len(pl_resp.text)} chars")
 
-                # Check if responses are valid JSON
+                # Check if responses are empty
                 if not bs_resp.text.strip():
-                    st.error("❌ Balance Sheet API returned empty response")
-                    st.write("Full Response:", bs_resp.text)
+                    st.error("❌ **Balance Sheet API returned EMPTY response**")
+                    st.write("**Headers sent:**", dict(headers))
+                    st.warning("**Possible causes:**")
+                    st.write("1. Your Xero account doesn't have any transactions/reports yet")
+                    st.write("2. Your token doesn't have permission to access Balance Sheet")
+                    st.write("3. The Xero API endpoint is temporarily down")
                     st.stop()
                 
                 if not pl_resp.text.strip():
-                    st.error("❌ P&L API returned empty response")
-                    st.write("Full Response:", pl_resp.text)
+                    st.error("❌ **P&L API returned EMPTY response**")
                     st.stop()
 
+                # Show raw response (first 500 chars) for debugging
+                st.info("📋 **Raw API Response (first 500 chars):**")
+                st.code(bs_resp.text[:500], language="json")
+
+                # Try to parse JSON
                 try:
                     bs_data = bs_resp.json()
-                except:
-                    st.error(f"❌ Balance Sheet: Invalid JSON response. Response: {bs_resp.text[:1000]}")
+                except Exception as json_error:
+                    st.error(f"❌ **Balance Sheet: Failed to parse JSON**")
+                    st.write(f"Error: {str(json_error)}")
+                    st.write(f"Raw response: {bs_resp.text[:1000]}")
                     st.stop()
 
                 try:
                     pl_data = pl_resp.json()
-                except:
-                    st.error(f"❌ P&L: Invalid JSON response. Response: {pl_resp.text[:1000]}")
+                except Exception as json_error:
+                    st.error(f"❌ **P&L: Failed to parse JSON**")
+                    st.write(f"Error: {str(json_error)}")
                     st.stop()
 
                 # Check for API error messages
-                if "ApiException" in bs_resp.text or "error" in bs_resp.text.lower():
-                    st.error("❌ Balance Sheet API Error")
+                if isinstance(bs_data, dict) and "ApiException" in bs_resp.text:
+                    st.error("❌ **Balance Sheet API Error**")
                     st.write("Response:", bs_data)
                     st.stop()
 
-                if "ApiException" in pl_resp.text or "error" in pl_resp.text.lower():
-                    st.error("❌ P&L API Error")
+                if isinstance(pl_data, dict) and "ApiException" in pl_resp.text:
+                    st.error("❌ **P&L API Error**")
                     st.write("Response:", pl_data)
                     st.stop()
 
                 # Validate data structure
-                if "Reports" not in bs_data or not bs_data["Reports"]:
-                    st.error("❌ No Balance Sheet reports found in response")
-                    st.write("Available keys:", list(bs_data.keys()))
+                if not isinstance(bs_data, dict) or "Reports" not in bs_data:
+                    st.error("❌ **No 'Reports' key in Balance Sheet response**")
+                    st.write("Available keys:", list(bs_data.keys()) if isinstance(bs_data, dict) else "Not a dict")
+                    st.write("Full Response:", bs_data)
+                    st.stop()
+
+                if not bs_data["Reports"]:
+                    st.error("❌ **'Reports' array is empty**")
                     st.write("Full Response:", bs_data)
                     st.stop()
 
                 if "Reports" not in pl_data or not pl_data["Reports"]:
-                    st.error("❌ No P&L reports found in response")
-                    st.write("Available keys:", list(pl_data.keys()))
+                    st.error("❌ **No P&L reports found in response**")
+                    st.write("Available keys:", list(pl_data.keys()) if isinstance(pl_data, dict) else "Not a dict")
                     st.stop()
 
                 bs_report = bs_data["Reports"][0]
                 pl_report = pl_data["Reports"][0]
+
+                st.success("✅ **Successfully parsed both reports!**")
 
                 # Better parsing function
                 def extract_value(report_rows, label):
@@ -197,7 +217,7 @@ if st.session_state.get("xero_token"):
 
                 # Extract period names
                 if not bs_report.get("Rows"):
-                    st.error("❌ No rows found in Balance Sheet report")
+                    st.error("❌ **No rows found in Balance Sheet report**")
                     st.write("Report keys:", list(bs_report.keys()))
                     st.stop()
 
@@ -205,7 +225,7 @@ if st.session_state.get("xero_token"):
                 period_names = [cell.get("Value", f"Period {i+1}") for i, cell in enumerate(header_row.get("Cells", [])[1:])]
 
                 if not period_names:
-                    st.error("❌ Could not extract period names")
+                    st.error("❌ **Could not extract period names**")
                     st.stop()
 
                 st.success(f"✅ Found {len(period_names)} periods: {', '.join(period_names[:3])}...")
@@ -308,7 +328,7 @@ if st.session_state.get("xero_token"):
                     st.plotly_chart(fig_assets, use_container_width=True)
 
             except Exception as e:
-                st.error(f"❌ Unexpected Error: {str(e)}")
+                st.error(f"❌ **Unexpected Error:** {str(e)}")
                 import traceback
                 st.write(traceback.format_exc())
 
