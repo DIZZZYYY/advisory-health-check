@@ -25,7 +25,7 @@ st.markdown("**Professional Financial Health & Insolvency Early Warning Tool**")
 st.error("⚠️ SCREENING TOOL ONLY — Not professional advice. Always consult a qualified accountant or registered liquidator.")
 
 # ======================= CONFIG =======================
-REDIRECT_URI = "https://advisory-health-check-1.onrender.com"
+REDIRECT_URI = "https://advisory-health-check.onrender.com"
 
 XERO_CLIENT_ID = os.getenv("XERO_CLIENT_ID")
 XERO_CLIENT_SECRET = os.getenv("XERO_CLIENT_SECRET")
