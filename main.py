@@ -103,7 +103,7 @@ if st.session_state.get("xero_token"):
                     headers["Xero-Tenant-Id"] = tenant_id
                     st.success(f"Connected to: {tenant.get('tenantName', 'Your Organisation')}")
 
-                # Fetch Reports
+                # Fetch Reports with JSON
                 params = {"periods": 6, "timeframe": "MONTH"}
                 bs_resp = requests.get("https://api.xero.com/api.xro/2.0/Reports/BalanceSheet", headers=headers, params=params)
                 pl_resp = requests.get("https://api.xero.com/api.xro/2.0/Reports/ProfitAndLoss", headers=headers, params=params)
@@ -115,7 +115,7 @@ if st.session_state.get("xero_token"):
                     bs_data = bs_resp.json()
                     pl_data = pl_resp.json()
                     st.success("✅ Successfully received JSON data from Xero!")
-                    st.json(bs_data)  # Temporary - shows raw data
+                    st.json(bs_data)  # Temporary debug - remove later
                 else:
                     st.error("Failed to fetch reports")
                     st.write(bs_resp.text[:500])
@@ -129,6 +129,6 @@ uploaded_file = st.file_uploader("Or upload CSV as fallback", type=["csv"])
 if uploaded_file:
     df = pd.read_csv(uploaded_file)
     st.success("CSV data loaded")
-    # Add your calculations, charts, AI chat here later
+    # Add your existing calculations, metrics, charts, AI chat here later
 
 st.caption("Advisory Health Check • Live on Render")
