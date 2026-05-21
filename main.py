@@ -34,13 +34,11 @@ st.markdown("""
     .stChatInputContainer { background: #111D35 !important; border: 1px solid #1E3A5F !important; border-radius: 12px; }
     div[data-testid="stChatInput"] textarea { background: #111D35 !important; color: #CBD5E1 !important; }
 
-    /* Health score badge */
     .health-badge { display: inline-block; padding: 0.3rem 1rem; border-radius: 999px; font-size: 0.85rem; font-weight: 600; letter-spacing: 0.04em; }
     .badge-green { background: #064E3B; color: #6EE7B7; border: 1px solid #065F46; }
     .badge-yellow { background: #78350F; color: #FCD34D; border: 1px solid #92400E; }
     .badge-red { background: #7F1D1D; color: #FCA5A5; border: 1px solid #991B1B; }
 
-    /* Section card */
     .section-card { background: #111D35; border: 1px solid #1E3A5F; border-radius: 14px; padding: 1.4rem 1.6rem; margin-bottom: 1rem; }
     .flag-item { padding: 0.5rem 0.8rem; border-radius: 8px; margin: 0.3rem 0; font-size: 0.88rem; }
     .flag-red { background: #450A0A; border-left: 3px solid #EF4444; color: #FCA5A5; }
@@ -50,7 +48,9 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ======================= CONFIG =======================
-REDIRECT_URI = "https://advisory-health-check-1.onrender.com"
+# ⚠️ REDIRECT_URI must exactly match what is registered in your Xero Developer Portal
+REDIRECT_URI = "https://advisory-health-check.onrender.com"
+
 XERO_CLIENT_ID = os.getenv("XERO_CLIENT_ID")
 XERO_CLIENT_SECRET = os.getenv("XERO_CLIENT_SECRET")
 XAI_API_KEY = os.getenv("XAI_API_KEY")
@@ -82,7 +82,6 @@ def format_currency(value):
     return f"${value:,.0f}"
 
 def extract_xero_value(report_data, section_name, row_name=None):
-    """Recursively pull a value from Xero report JSON."""
     try:
         reports = report_data.get("Reports", [])
         if not reports:
@@ -101,7 +100,6 @@ def extract_xero_value(report_data, section_name, row_name=None):
                             except:
                                 return None
                     else:
-                        # Return summary row (last row in section)
                         if cells and len(cells) > 1:
                             try:
                                 return float(cells[1].get("Value", "0").replace(",", "") or 0)
@@ -112,7 +110,6 @@ def extract_xero_value(report_data, section_name, row_name=None):
         return None
 
 def extract_all_values(report_data, section_name):
-    """Extract all rows from a section as a dict of {label: value}."""
     result = {}
     try:
         reports = report_data.get("Reports", [])
@@ -137,23 +134,19 @@ def extract_all_values(report_data, section_name):
     return result
 
 def parse_financials(bs_data, pl_data):
-    """Parse key financial figures from Xero JSON."""
     fin = {}
 
-    # Balance Sheet
     fin["current_assets"] = extract_xero_value(bs_data, "Current Assets")
     fin["total_assets"] = extract_xero_value(bs_data, "Total Assets")
     fin["current_liabilities"] = extract_xero_value(bs_data, "Current Liabilities")
     fin["total_liabilities"] = extract_xero_value(bs_data, "Total Liabilities")
     fin["equity"] = extract_xero_value(bs_data, "Total Equity")
 
-    # Also try alternate label names Xero uses
     if fin["current_assets"] is None:
         fin["current_assets"] = extract_xero_value(bs_data, "current")
     if fin["total_liabilities"] is None:
         fin["total_liabilities"] = extract_xero_value(bs_data, "liabilities")
 
-    # P&L
     fin["revenue"] = extract_xero_value(pl_data, "Income")
     if fin["revenue"] is None:
         fin["revenue"] = extract_xero_value(pl_data, "Revenue")
@@ -165,12 +158,11 @@ def parse_financials(bs_data, pl_data):
     if fin["expenses"] is None:
         fin["expenses"] = extract_xero_value(pl_data, "Total Expenses")
 
-    # Derived ratios
     ca = fin["current_assets"] or 0
     cl = fin["current_liabilities"] or 0
     ta = fin["total_assets"] or 0
     tl = fin["total_liabilities"] or 0
-    rev = fin["revenue"] or 1  # avoid div/0
+    rev = fin["revenue"] or 1
     np_ = fin["net_profit"] or 0
     eq = fin["equity"] or 0
 
@@ -178,12 +170,11 @@ def parse_financials(bs_data, pl_data):
     fin["debt_to_equity"] = round(tl / eq, 2) if eq else None
     fin["net_profit_margin"] = round((np_ / rev) * 100, 1) if rev else None
     fin["working_capital"] = ca - cl
-    fin["solvency_ratio"] = round(eq / ta, 2) if ta else None  # equity / total assets
+    fin["solvency_ratio"] = round(eq / ta, 2) if ta else None
 
     return fin
 
 def assess_health(fin):
-    """Return flags, score, and overall rating."""
     flags = []
     score = 100
 
@@ -241,14 +232,11 @@ def assess_health(fin):
 
     score = max(0, score)
     if score >= 70:
-        rating = "green"
-        label = "HEALTHY"
+        rating, label = "green", "HEALTHY"
     elif score >= 45:
-        rating = "yellow"
-        label = "CAUTION"
+        rating, label = "yellow", "CAUTION"
     else:
-        rating = "red"
-        label = "AT RISK"
+        rating, label = "red", "AT RISK"
 
     return flags, score, rating, label
 
@@ -415,7 +403,6 @@ if st.session_state.xero_token and not st.session_state.selected_tenant:
     if len(tenants) == 0:
         st.warning("No Xero organisations found on this account.")
     elif len(tenants) == 1:
-        # Auto-select if only one
         st.session_state.selected_tenant = tenants[0]
         st.rerun()
     else:
@@ -467,7 +454,6 @@ if st.session_state.bs_data and st.session_state.pl_data:
 
     badge_class = f"badge-{rating}"
 
-    # ---- Header row ----
     st.markdown("---")
     col_title, col_badge = st.columns([5, 1])
     with col_title:
@@ -476,7 +462,6 @@ if st.session_state.bs_data and st.session_state.pl_data:
     with col_badge:
         st.markdown(f"<div style='margin-top:1.5rem'><span class='health-badge {badge_class}'>{label}</span><br><span style='color:#64748B;font-size:0.75rem'>Score: {score}/100</span></div>", unsafe_allow_html=True)
 
-    # ---- Key Metrics ----
     st.markdown("### Key Metrics")
     m1, m2, m3, m4, m5, m6 = st.columns(6)
     m1.metric("Revenue", format_currency(fin["revenue"]))
@@ -486,7 +471,6 @@ if st.session_state.bs_data and st.session_state.pl_data:
     m5.metric("Total Equity", format_currency(fin["equity"]))
     m6.metric("Working Capital", format_currency(fin["working_capital"]))
 
-    # ---- Ratios ----
     st.markdown("### Solvency & Liquidity Ratios")
     r1, r2, r3 = st.columns(3)
 
@@ -502,7 +486,6 @@ if st.session_state.bs_data and st.session_state.pl_data:
     sr_delta = "✅ Solid" if sr and sr >= 0.4 else ("⚠️ Low" if sr and sr >= 0.2 else "🚨 Very Low")
     r3.metric("Solvency Ratio", f"{sr:.2f}" if sr else "N/A", sr_delta, delta_color="off")
 
-    # ---- Charts ----
     st.markdown("### Financial Position")
     ch1, ch2 = st.columns(2)
 
@@ -548,7 +531,6 @@ if st.session_state.bs_data and st.session_state.pl_data:
         )
         st.plotly_chart(fig2, use_container_width=True)
 
-    # ---- Health Flags ----
     st.markdown("### Health Assessment")
     for severity, message in flags:
         css_class = f"flag-{severity}"
@@ -559,7 +541,7 @@ if st.session_state.bs_data and st.session_state.pl_data:
         st.markdown("""
         <div style='margin-top:1rem; padding:0.9rem 1.2rem; background:#0C1F3F; border:1px solid #1D4ED8;
              border-radius:10px; color:#93C5FD; font-size:0.88rem;'>
-        💼 <strong>Recommendation:</strong> One or more areas require attention. We strongly recommend 
+        💼 <strong>Recommendation:</strong> One or more areas require attention. We strongly recommend
         speaking with your accountant or a registered liquidator before making major financial decisions.
         </div>
         """, unsafe_allow_html=True)
@@ -575,25 +557,21 @@ if st.session_state.bs_data and st.session_state.pl_data:
     system_prompt = build_ai_prompt(fin, flags, company_name, industry, business_type, extra_context)
     system_prompt += "\n\nIn all follow-up messages: be conversational, plain-English, and no longer than necessary. If the user's question touches on serious solvency concerns, always recommend they speak with their accountant or a registered liquidator."
 
-    # Auto-start the first AI message
     if not st.session_state.chat_started:
         with st.spinner("Your advisor is reviewing the numbers..."):
             opening = get_ai_response([], system_prompt)
             st.session_state.chat_history.append({"role": "assistant", "content": opening})
             st.session_state.chat_started = True
 
-    # Display chat history
     for msg in st.session_state.chat_history:
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
 
-    # Chat input
     user_input = st.chat_input("Ask about your financials, cash flow, solvency, or next steps...")
     if user_input:
         st.session_state.chat_history.append({"role": "user", "content": user_input})
         with st.chat_message("user"):
             st.markdown(user_input)
-
         with st.chat_message("assistant"):
             with st.spinner("Thinking..."):
                 reply = get_ai_response(st.session_state.chat_history, system_prompt)
