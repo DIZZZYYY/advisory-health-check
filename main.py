@@ -50,10 +50,10 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ======================= CONFIG =======================
-REDIRECT_URI = "https://advisory-health-check.onrender.com"
-XERO_CLIENT_ID = os.getenv("3A3212CADA7F422D8F378158BD05E73D")
-XERO_CLIENT_SECRET = os.getenv("t0qpI3mZ3nfZmnYC8QZYIlMzQnjfzIPKgY_msUvSMwzdFtMS")
-XAI_API_KEY = os.getenv("xai-ZhJmivrlx7GY0R2K6uI1SediFAD3D8b5NndfD7ct2jvK0oX4BR6wSTdioZXGTgVnPdDsTQYdBBZSnsVQ")
+REDIRECT_URI = "https://advisory-health-check-1.onrender.com"
+XERO_CLIENT_ID = os.getenv("XERO_CLIENT_ID")
+XERO_CLIENT_SECRET = os.getenv("XERO_CLIENT_SECRET")
+XAI_API_KEY = os.getenv("XAI_API_KEY")
 
 # ======================= SESSION STATE =======================
 for key, default in {
