@@ -7,7 +7,7 @@ from datetime import datetime
 import os
 import requests
 from urllib.parse import urlencode
-from openai import OpenAI
+from openai import OpenAI  # xAI uses an OpenAI-compatible SDK
 
 st.set_page_config(page_title="Advisory Health Check", layout="wide")
 
@@ -50,10 +50,10 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ======================= CONFIG =======================
-REDIRECT_URI = "https://advisory-health-check-1.onrender.com"
-XERO_CLIENT_ID = os.getenv("XERO_CLIENT_ID")
-XERO_CLIENT_SECRET = os.getenv("XERO_CLIENT_SECRET")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+REDIRECT_URI = "https://advisory-health-check.onrender.com"
+XERO_CLIENT_ID = os.getenv("3A3212CADA7F422D8F378158BD05E73D")
+XERO_CLIENT_SECRET = os.getenv("t0qpI3mZ3nfZmnYC8QZYIlMzQnjfzIPKgY_msUvSMwzdFtMS")
+XAI_API_KEY = os.getenv("xai-ZhJmivrlx7GY0R2K6uI1SediFAD3D8b5NndfD7ct2jvK0oX4BR6wSTdioZXGTgVnPdDsTQYdBBZSnsVQ")
 
 # ======================= SESSION STATE =======================
 for key, default in {
@@ -286,13 +286,13 @@ INSTRUCTIONS:
 Keep your response to under 350 words. Use plain paragraphs, no bullet points in your opening response."""
 
 def get_ai_response(messages, system_prompt):
-    if not OPENAI_API_KEY:
-        return "⚠️ OpenAI API key not configured. Set OPENAI_API_KEY in your Render environment variables to enable AI chat."
+    if not XAI_API_KEY:
+        return "⚠️ xAI API key not configured. Set XAI_API_KEY in your Render environment variables to enable AI chat."
     try:
-        client = OpenAI(api_key=OPENAI_API_KEY)
+        client = OpenAI(api_key=XAI_API_KEY, base_url="https://api.x.ai/v1")
         full_messages = [{"role": "system", "content": system_prompt}] + messages
         response = client.chat.completions.create(
-            model="gpt-4o",
+            model="grok-3",
             messages=full_messages,
             max_tokens=600,
             temperature=0.7,
